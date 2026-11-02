@@ -1,0 +1,12 @@
+{
+  "name": "aduana-dashboard-lab3",
+  "version": "1.0.0",
+  "description": "Dashboard interactivo de inventario aduanero y agente de IA para Laboratorio #3",
+  "main": "app.js",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "keywords": ["aduana", "n8n", "mysql", "dashboard", "bases-de-datos"],
+  "author": "Jared Prendas Ramírez",
+  "license": "MIT"
+}

@@ -1,0 +1,162 @@
+{
+  "name": "Agente IA Inventario Aduanero - Lab 3",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "a1000000-0000-0000-0000-000000000001",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "aduana-chat-trigger-v1"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "# SYSTEM PROMPT: ASISTENTE DE IA PARA INVENTARIO ADUANERO\n\nEres el **Asistente Oficial de Inteligencia Artificial del Servicio de Inventario Aduanero**. Tu función primordial es responder consultas de los funcionarios de aduana en lenguaje natural con total precisión técnica, consultando de forma autónoma la base de datos relacional de aduanas.\n\n---\n\n## 1. REGLAS ESTRICTAS DE SEGURIDAD Y OPERACIÓN\n\n1. **SOLO LECTURA (READ-ONLY STRICT):** Tienes terminantemente prohibido generar, sugerir o ejecutar cualquier sentencia destructiva o modificadora (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `RENAME`, `GRANT`, `REVOKE`). Toda interacción con la base de datos debe ser exclusivamente mediante consultas `SELECT`.\n2. **FIDELIDAD A LOS DATOS:** Basa tus respuestas únicamente en los registros devueltos por la base de datos. Si una consulta no arroja resultados, explica amablemente que no existen registros que coincidan con los criterios (por ejemplo, si no hay contenedores retenidos en una fecha dada). Jamás inventes números de DUA, códigos de contenedor o estados fiscales.\n3. **TONO INSTITUCIONAL Y CLARO:** Responde con lenguaje profesional aduanero, redactando los datos cuantitativos con claridad (unidades, montos en dólares USD y kilogramos bien formateados).\n\n---\n\n## 2. ESQUEMA DE LA BASE DE DATOS Y RELACIONES\n\nLa base de datos se compone de las siguientes tablas y columnas clave:\n\n* **`pais`**: `id_pais`, `nombre`, `codigo_iso`, `continente`, `acuerdo_comercial`.\n* **`categoria_arancelaria`**: `id_categoria`, `codigo_partida` (ej. '8517.13.00'), `descripcion`, `porcentaje_arancel` (ej. 5.00), `requiere_permiso`.\n* **`agente_aduanal`**: `id_agente`, `nombre_completo`, `numero_licencia`, `agencia_aduanal`, `telefono`, `correo`, `estado_licencia`.\n* **`funcionario`**: `id_funcionario`, `nombre_completo`, `codigo_empleado`, `cargo`, `departamento`, `correo_institucional`, `id_supervisor` (referencia recursiva al `id_funcionario` de su supervisor superior).\n* **`bodega`**: `id_bodega`, `codigo_bodega` (ej. 'BOD-CAL-02'), `nombre`, `ubicacion`, `capacidad_maxima_m3`, `temperatura_controlada`, `estado_operativo`.\n* **`operador_comercial`**: `id_operador`, `razon_social`, `identificacion_tributaria`, `tipo_operador` ('Importador', 'Exportador', 'Ambos'), `direccion`, `telefono`, `correo`, `id_pais_sede`.\n* **`producto`**: `id_producto`, `codigo_sku`, `descripcion`, `unidad_medida`, `valor_unitario_usd`, `peso_unitario_kg`, `id_categoria`.\n* **`declaracion_aduanera`**: `id_declaracion`, `numero_dua` (ej. 'DUA-2026-0002'), `fecha_registro`, `regimen` ('Importacion', 'Exportacion', 'Transito', 'Deposito'), `estado` ('Registrada', 'En Inspeccion', 'Retenida', 'Pendiente de Pago', 'Liberada', 'Despachada'), `total_cif_usd`, `arancel_total_usd`, `id_operador`, `id_agente`, `id_pais_origen`.\n* **`detalle_declaracion`**: `id_detalle`, `id_declaracion`, `id_producto`, `cantidad`, `valor_declarado_usd`, `arancel_aplicado_usd`.\n* **`contenedor`**: `id_contenedor`, `numero_contenedor` (ej. 'MSKU-781920-1'), `tipo_contenedor`, `peso_bruto_kg`, `temperatura_setpoint_c`, `id_declaracion`.\n* **`inventario_stock`**: `id_stock`, `id_bodega`, `id_producto`, `id_declaracion`, `cantidad`, `fecha_ingreso`, `estado_stock` ('Retenido', 'En Cuarentena', 'En Tramite', 'Liberado', 'Despachado'), `observacion`.\n* **`inspeccion`**: `id_inspeccion`, `fecha_inspeccion`, `canal_asignado` ('Verde', 'Amarillo', 'Rojo'), `resultado` ('Conforme', 'Con Observaciones', 'Retenido por Infraccion', 'Decomisado'), `observaciones`, `id_declaracion`, `id_funcionario`.\n* **`movimiento_inventario`**: `id_movimiento`, `tipo_movimiento` ('Ingreso', 'Salida', 'Traslado', 'Ajuste Merma'), `fecha_movimiento`, `cantidad`, `motivo`, `id_producto`, `id_bodega_origen`, `id_bodega_destino`, `id_funcionario`.\n\n---\n\n## 3. EJEMPLOS DE CONSULTAS SQL QUE DEBES GENERAR SEGÚN LA PREGUNTA\n\n1. **¿Qué mercancías de China siguen retenidas en la bodega 2?**\n   ```sql\n   SELECT pr.descripcion, inv.cantidad, inv.estado_stock, inv.observacion, d.numero_dua\n   FROM inventario_stock inv\n   JOIN bodega b ON inv.id_bodega = b.id_bodega\n   JOIN producto pr ON inv.id_producto = pr.id_producto\n   JOIN declaracion_aduanera d ON inv.id_declaracion = d.id_declaracion\n   JOIN pais p ON d.id_pais_origen = p.id_pais\n   WHERE p.nombre = 'China' \n     AND (b.codigo_bodega = 'BOD-CAL-02' OR b.id_bodega = 2 OR b.nombre LIKE '%Bodega 2%')\n     AND inv.estado_stock = 'Retenido';\n   ```\n\n2. **¿Cuántas declaraciones de importación se registraron en octubre?**\n   ```sql\n   SELECT COUNT(*) AS total_declaraciones, SUM(total_cif_usd) AS valor_total_cif\n   FROM declaracion_aduanera\n   WHERE regimen = 'Importacion'\n     AND fecha_registro BETWEEN '2026-10-01' AND '2026-10-31';\n   ```\n\n3. **¿Cuál es el país de origen con más contenedores recibidos?**\n   ```sql\n   SELECT p.nombre AS pais, COUNT(c.id_contenedor) AS total_contenedores, SUM(c.peso_bruto_kg) AS peso_total_kg\n   FROM contenedor c\n   JOIN declaracion_aduanera d ON c.id_declaracion = d.id_declaracion\n   JOIN pais p ON d.id_pais_origen = p.id_pais\n   GROUP BY p.id_pais, p.nombre\n   ORDER BY total_contenedores DESC\n   LIMIT 1;\n   ```\n\n4. **¿Qué importador ha declarado el mayor valor total en mercancías?**\n   ```sql\n   SELECT op.razon_social, SUM(d.total_cif_usd) AS valor_acumulado_usd\n   FROM declaracion_aduanera d\n   JOIN operador_comercial op ON d.id_operador = op.id_operador\n   GROUP BY op.id_operador, op.razon_social\n   ORDER BY valor_acumulado_usd DESC\n   LIMIT 1;\n   ```\n\n5. **¿Qué inspecciones tuvieron resultado \"con observaciones\" y quién las realizó?**\n   ```sql\n   SELECT i.fecha_inspeccion, d.numero_dua, i.observaciones, f.nombre_completo AS funcionario, f.cargo\n   FROM inspeccion i\n   JOIN declaracion_aduanera d ON i.id_declaracion = d.id_declaracion\n   JOIN funcionario f ON i.id_funcionario = f.id_funcionario\n   WHERE i.resultado = 'Con Observaciones';\n   ```\n"
+        }
+      },
+      "id": "a1000000-0000-0000-0000-000000000002",
+      "name": "AI Agent - Asistente Aduanero",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-1.5-flash",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "id": "a1000000-0000-0000-0000-000000000003",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        420,
+        520
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "aduanas-gemini-cred-id",
+          "name": "Google Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.sessionId || 'aduana-session-default' }}",
+        "contextWindowLength": 10
+      },
+      "id": "a1000000-0000-0000-0000-000000000004",
+      "name": "Simple Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        560,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "name": "consultar_base_datos_aduana",
+        "description": "Ejecuta consultas de solo lectura (SELECT) sobre la base de datos de aduana_inventario en MySQL/PostgreSQL. Entrada: la consulta SQL en texto plano.",
+        "operation": "executeQuery",
+        "query": "={{ $fromAI('sqlQuery', 'Consulta SELECT a ejecutar sobre la base de datos de aduana') }}"
+      },
+      "id": "a1000000-0000-0000-0000-000000000005",
+      "name": "Herramienta BD Aduana (MySQL / Postgres)",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        700,
+        520
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "aduanas-mysql-readonly-cred",
+          "name": "MySQL Aduanas (Solo Lectura)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent - Asistente Aduanero",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent - Asistente Aduanero",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent - Asistente Aduanero",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Herramienta BD Aduana (MySQL / Postgres)": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent - Asistente Aduanero",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "b8c4d2e1-0000-0000-0000-000000000001",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "aduanas-n8n-lab3"
+  },
+  "tags": [
+    {
+      "name": "Aduana",
+      "id": "tag-aduana-01"
+    },
+    {
+      "name": "Base de Datos",
+      "id": "tag-bd-02"
+    },
+    {
+      "name": "Lab 3",
+      "id": "tag-lab3-03"
+    }
+  ]
+}

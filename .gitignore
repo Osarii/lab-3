@@ -1,0 +1,10 @@
+# Dependencias y temporales
+node_modules/
+.DS_Store
+*.tmp
+*.log
+
+# Build outputs si se usan bundlers
+dist/
+build/
+.cache/

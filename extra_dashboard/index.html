@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aduana Inteligente - Dashboard y Agente de IA</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Barra Lateral -->
+    <aside class="sidebar">
+      <div class="logo-box">
+        <div class="logo-badge">CR</div>
+        <div>
+          <h2>AduanaControl</h2>
+          <span class="sub">Inventario y Agente IA</span>
+        </div>
+      </div>
+      <nav class="nav-menu">
+        <button class="nav-item active" onclick="switchTab('dashboard')">
+          <span class="icon">📊</span> Panel de Indicadores
+        </button>
+        <button class="nav-item" onclick="switchTab('agent')">
+          <span class="icon">🤖</span> Agente IA (Chat en Vivo)
+        </button>
+        <button class="nav-item" onclick="switchTab('tables')">
+          <span class="icon">📋</span> Explorador de Tablas
+        </button>
+      </nav>
+      <div class="user-footer">
+        <strong>Jared Prendas Ramírez</strong>
+        <span>Laboratorio #3 · Bases de Datos</span>
+      </div>
+    </aside>
+
+    <!-- Contenido Principal -->
+    <main class="main-content">
+      <!-- HEADER -->
+      <header class="topbar">
+        <div>
+          <h1 id="page-title">Sistema de Inventario Aduanero y Fiscalización</h1>
+          <p id="page-desc">Monitoreo de carga, mercancías retenidas y agente conectado a MySQL 8.0</p>
+        </div>
+        <div class="badge-status">
+          <span class="pulse"></span> Base de Datos: aduana_inventario (Conectada)
+        </div>
+      </header>
+
+      <!-- TAB 1: DASHBOARD -->
+      <section id="tab-dashboard" class="tab-pane active">
+        <!-- Tarjetas de Métricas -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <span class="kpi-label">Contenedores Recibidos</span>
+            <div class="kpi-val" id="kpi-contenedores">16</div>
+            <span class="kpi-sub">321.8 Toneladas brutas</span>
+          </div>
+          <div class="kpi-card warning">
+            <span class="kpi-label">Mercancías Retenidas</span>
+            <div class="kpi-val text-warning" id="kpi-retenidos">11 lotes</div>
+            <span class="kpi-sub">Concentradas en Bodega 2 y Moín</span>
+          </div>
+          <div class="kpi-card success">
+            <span class="kpi-label">Valor Declarado (CIF)</span>
+            <div class="kpi-val text-success">$1,029,900</div>
+            <span class="kpi-sub">DUAs octubre - noviembre</span>
+          </div>
+          <div class="kpi-card primary">
+            <span class="kpi-label">Aranceles Recaudados</span>
+            <div class="kpi-val text-primary">$176,570</div>
+            <span class="kpi-sub">100% liquidado en sistema</span>
+          </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="charts-grid">
+          <div class="chart-card">
+            <h3>Contenedores y Peso por País de Procedencia</h3>
+            <canvas id="chartPaises"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Estado del Inventario Físico en Bodegas</h3>
+            <canvas id="chartEstados"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: AGENTE DE IA EN VIVO -->
+      <section id="tab-agent" class="tab-pane">
+        <div class="agent-container">
+          <div class="chat-wrapper">
+            <div class="chat-header">
+              <div class="bot-info">
+                <span class="bot-avatar">🤖</span>
+                <div>
+                  <strong>Agente Aduanero n8n (MySQL Read-Only)</strong>
+                  <span class="status-online">Online · Modelo Gemini 1.5 Flash</span>
+                </div>
+              </div>
+              <div class="prompt-chips">
+                <button class="chip" onclick="sendQuickPrompt('¿Qué mercancías de China siguen retenidas en la bodega 2?')">
+                  Retenidas en Bodega 2
+                </button>
+                <button class="chip" onclick="sendQuickPrompt('¿Cuántas declaraciones de importación se registraron en octubre?')">
+                  DUAs Octubre
+                </button>
+                <button class="chip" onclick="sendQuickPrompt('¿Cuál es el país de origen con más contenedores recibidos?')">
+                  Top País Contenedores
+                </button>
+                <button class="chip" onclick="sendQuickPrompt('¿Quién es el supervisor del funcionario que realizó la inspección de la DUA-2026-0004?')">
+                  Supervisor de DUA-0004
+                </button>
+              </div>
+            </div>
+
+            <div class="chat-messages" id="chat-messages">
+              <div class="message bot">
+                <div class="msg-bubble">
+                  👋 <strong>Hola funcionario aduanero.</strong> Soy tu asistente inteligente de inventario aduanero conectado a la base de datos MySQL en modo de solo lectura. Puedes consultarme cualquier duda sobre DUAs, mercancías retenidas, partidas arancelarias o inspecciones.
+                </div>
+              </div>
+            </div>
+
+            <div class="chat-input-area">
+              <input type="text" id="chat-input" placeholder="Escribe tu consulta aduanera en lenguaje natural..." onkeypress="handleKey(event)" />
+              <button class="btn-send" onclick="sendMessage()">Enviar Consulta</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: EXPLORADOR DE TABLAS -->
+      <section id="tab-tables" class="tab-pane">
+        <div class="table-container-card">
+          <div class="table-header-ctrls">
+            <h3>Mercancías Retenidas en Custodia Oficial</h3>
+            <span class="badge-tag">Consulta SQL 2</span>
+          </div>
+          <table class="styled-table">
+            <thead>
+              <tr>
+                <th>Bodega</th>
+                <th>País de Origen</th>
+                <th>DUA</th>
+                <th>SKU</th>
+                <th>Descripción</th>
+                <th>Cantidad</th>
+                <th>Estado</th>
+                <th>Motivo de Retención</th>
+              </tr>
+            </thead>
+            <tbody id="table-body-retenidos">
+              <!-- Llenado dinámico por JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
